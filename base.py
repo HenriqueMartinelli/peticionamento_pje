@@ -2,6 +2,7 @@ import json
 import urllib
 from bs4 import BeautifulSoup
 from scheme import SCHEME
+from datetime import datetime
 
 
 class BaseRequest:
@@ -12,13 +13,12 @@ class BaseRequest:
 
 
 
-    def search_inputs(content):
+    def search_inputs(self, content):
         soup = BeautifulSoup(content, "html.parser")
         return {
             "cid" :soup.find('input', {'name': 'cid'})['value'],
             "mimes" : soup.find('input', {'name': 'mimes'})['value'],
             "mimesEhSizes" : soup.find('input', {'name': 'mimesEhSizes'})['value'],
-            "ViewState" : soup.find('input', {'name': 'javax.faces.ViewState'})['value'],
             "AjaxRequest" : soup.find('input', {'id': 'commandButtonLoteTipo'})['onclick'].split("containerId':'")[1].split("',")[0],
             "qtdDoc" : soup.find('input', {'id': 'quantidadeProcessoDocumento'})['value'],
             "ViewState": soup.find('input', {'name': 'javax.faces.ViewState'})['value']
@@ -26,16 +26,36 @@ class BaseRequest:
 
 
     def switch_to_screen(self, screen: str):
-        if screen in SCHEME():
             self.current_screen = screen
-        else:
-            raise Exception(f"Screen {screen} not found")
 
+    def event_expected(self, screen, response):
+        msg = str()
+        data = SCHEME()[screen]['expected_message']
+        soup = BeautifulSoup(response.content, "html.parser")
+        if data.get('tag'):
+            text_result = soup.find(data['tag'], {data['type']: data['value']}).text.strip().lower()
+            if data['expected_text'] in text_result:
+                self.returnMsg(msg, error=False, response=response)
+            elif data['not_expected'] in text_result:
+                self.returnMsg(msg, error=True, response=response)
+            elif data['expected_url'] in response.url:
+                self.returnMsg(msg, error=False, response=response)
 
-    @staticmethod
-    def returnMsg(self, infos, msg):
-        finally_msg = f"User: {infos.get('usuario')}, Caer:{infos.get('caer')}, Renach: {infos.get('protocolo')}, Return {msg}"
-        infos.update({'log': finally_msg})
+         
+
+    def returnMsg(self, msg, error, response):
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+        event = {
+                "event":{  
+                "screen":self.current_screen,
+                "created_at":dt_string,
+                "data":{
+                        "msg": msg,
+                        "error": error,
+                        "status_code": response.status_code
+                }}}
+        return event
                 
 
     @staticmethod
@@ -57,15 +77,6 @@ class BaseRequest:
         return js[text]
     
 
-    def send_request(self, session, headers, payload):
-        payload_decode = urllib.parse.urlencode(payload, quote_via=urllib.parse.quote)
-        response = session.post(
-            url='https://pje.tjba.jus.br/pje/Processo/CadastroPeticaoAvulsa/peticaoPopUp.seam',
-            headers=headers,
-            data=payload_decode,
-        )
-
-
     def add_schedule(self, qtddoc, descDoc, tipoDoc):
         return [
             (f'j_id223:{qtddoc}:ordem', '2'),
@@ -82,10 +93,11 @@ class BaseRequest:
             return self.session.request(method, url=url, params=params,
                                   headers=headers, data=payload, files=files
                                 )
-    def update_form(self, qtdDoc, descDoc, tipoDoc, payload, headers):
-            scheme = SCHEME(inputs=self.inputs, num_termo=tipoDoc, peticionarUrl=self.peticionarHTML)
-            payloadUpdate = scheme['GlobalForm']['headers']
-            headersUpdate = scheme['GlobalForm']['payload']
+    
+    def update_form(self, tipoDoc, payload, headers, qtdDoc=0, descDoc=None, ):
+            scheme = SCHEME(inputs=self.inputs, num_termo=tipoDoc, peticionarUrl=self.peticionarHTML.url)
+            payloadUpdate = scheme['GlobalForm']['payload']
+            headersUpdate = scheme['GlobalForm']['headers']
             payloadUpdate.update(payload), headersUpdate.update(headers)
             if int(qtdDoc) > 0:
                 payload = [(key, payload[key]) for key in payload]
@@ -93,21 +105,22 @@ class BaseRequest:
             return payloadUpdate, headersUpdate
     
 
-    def find_locator(self, element:str, inputs:dict(), arquivo=None, num_termos=None,  files=None):
+    def find_locator(self, element:str, arquivo=None, num_termos=None,  files=None, inputs=None,
+                     username=None, password=None, captcha=None):
         screen = self.current_screen
-        datas = SCHEME(num_termo=num_termos, inputs=inputs, arquivo=arquivo, files=files)[screen][element]
-
-        lista = list()
+        datas = SCHEME(num_termo=num_termos, inputs=inputs, arquivo=arquivo, 
+                       files=files, username=username, password=password, captcha=captcha)[screen][element]
         for data in datas:
-            payload, headers = self.update_form(qtdDoc=inputs['qtdDoc'], descDoc=arquivo, 
-                                                tipoDoc=num_termos, payload=data['payload'], headers=data['headers'])
+            if datas['update_form']:
+                payload, headers = self.update_form(qtdDoc=inputs['qtdDoc'], descDoc=arquivo, 
+                                                    tipoDoc=num_termos, payload=data['payload'], headers=data['headers'])
             
-            r = self.request(method=data['method'], 
+            response = self.request(method=data['method'], 
                          url=data['url'], payload=payload, 
                          headers=headers, params=data['params'],
                          decode=data['decode'], files=data['files'])
             
-            lista.append(r.text)
-            if 'finalizado' in r.text.lower():
+            if 'finalizado' in response.text.lower():
                 print('ENVIADO')
-        return lista
+        return response
+    
