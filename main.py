@@ -8,35 +8,37 @@ import mimetypes
 
 from typing import Union, List
 from fastapi import FastAPI, Request
-from crawler import crawler, MainClientException
+from src.pje_pet import Pje_pet, MainClientException
 
-client = crawler()
+client = Pje_pet()
 app = FastAPI()
 session = requests.session()
 
-### ARRUMAR OS PONTOS DO PROCESSO
+
 @app.post("/upload")
 async def upload(request: Request):
     try:
         form = await request.json()
-        content = get_content(content=form, required_fields=["tipo", "files", "processo", "username", "password"])
+        content = get_content(content=form, required_fields=["tipo", "files", "processo", "idProcesso",
+                                                             "username", "password", "idTarefa", "instancia"])
+        
+        client.set_global_variable(len(content['files']), content['idTarefa'], content['processo'], content['instancia'])
         client.login(username=content['username'], password=content['password'], session=session)
-
+        cont = 0 
         for num, file in enumerate(content['files']):
+            cont += 1
             mime, mimetype, file_size = get_extension(file)
             decode_file = base64.b64decode(file)
-            parametro = client.find_text(content['tipo'])
+            client.start(content=content, num=num, mimetype=mimetype, 
+                         file=decode_file, mime=mime, file_size=file_size, cont=cont)
 
-            client.search_links(numero_processo=content['processo'].strip(), session=session)
-            client.prepare_upload(num_termo=parametro)
-            client.schedule_request(filename=f"anexo{num}{mimetype}", file=decode_file, 
-                                    num_termo=parametro, mime=mime, file_size=file_size, mimetype=mimetype)
-        
         return {"message": f"Successfully uploaded files"}
     except MainClientException as e:
+        client.returnMsg(msg=F"Fatal Error: {e}", error= True, forced=True)
         return error(e.args[0])
-    except:
-        return error() 
+    except Exception as e:
+        client.returnMsg(msg=F"Fatal Error: {e}", error= True, forced=True)
+        return error(msg=e.args[0]) 
 
 
 #   Utils
@@ -57,6 +59,7 @@ def get_content(content, required_fields):
 def validate_content(content, required_fields):
     for field in required_fields:
         if field not in content:
+            print(field)
             raise MainClientException("Requisição inválida.")
 
 def error(msg="Erro desconhecido ao processar requisição."):
