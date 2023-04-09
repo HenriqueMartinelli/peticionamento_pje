@@ -121,22 +121,5 @@ class Pje_pet(BaseRequest):
                                          mime=mime, file_size=file_size)
         self.event_expected("ScheduleRequestForm", response)
 
-    def change_screen_pje(self):
-        self.peticionarHTML = self.session.request('GET', 'https://pje.tjba.jus.br/pje/Processo/update.seam?idProcesso=12092258&documentoReclamante=&tab=assunto&cadastraProcessoConsumidorGovBr=false')
-        soup = BeautifulSoup(self.peticionarHTML.content, "html.parser")
-        self.inputs["ViewState"] = soup.find('input', {'name': 'javax.faces.ViewState'})['value']
-
-
-        headers = {
-            'Accept': '*/*',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7,it;q=0.6',
-            'Connection': 'keep-alive',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Origin': 'https://pje.tjba.jus.br',
-            'Referer': self.peticionarHTML.url,            
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36',
-        }
-        ViewState = self.inputs['ViewState']
-        data = f'AJAXREQUEST=_viewRoot&javax.faces.ViewState={ViewState}&novoAnexo=novoAnexo&AJAX%3AEVENTS_COUNT=1&'
-        session.post('https://pje.tjba.jus.br/pje/Processo/update.seam', headers=headers, data=data)
+  
 
