@@ -10,6 +10,7 @@ class BaseRequest:
     def __init__(self):
         
         self.URL_BASE = 'http://refor.detran.rj.gov.br/'
+        self.URL_WOOK = ''
         self.inputs = {'qtdDoc': 0}
         self.files = list()
         self.current_screen = str()
@@ -26,7 +27,6 @@ class BaseRequest:
         self.idTarefa = idTarefa
         URL_1 = 'https://pje.tjba.jus.br/pje'
         URL_2 = 'https://pje2g.tjba.jus.br/pje'
-        # self.instancia = 1 if processo[-4:] != '0000' else 2
         self.inputs['URL_BASE'] = URL_1 if self.instancia in (1, '1') else URL_2
         self.inputs['domain'] = self.inputs['URL_BASE'].split('br')[0] + 'br'
         self.inputs['processo'] = processo.strip()
@@ -44,7 +44,7 @@ class BaseRequest:
                 "ViewState": soup.find('input', {'name': 'javax.faces.ViewState'})['value']
             }
         except:
-                {"ViewState": soup.find('input', {'name': 'javax.faces.ViewState'})['value']}
+                return {"ViewState": soup.find('input', {'name': 'javax.faces.ViewState'})['value']}
 
     
 
@@ -56,7 +56,12 @@ class BaseRequest:
         data = SCHEME(inputs=self.inputs)[screen]['expected_message']
         soup = BeautifulSoup(response.content, "html.parser")
 
-        if data.get('tag') and data.get('tag'):
+        if data['not_expected_url'] in response.text and self.current_screen == 'ScheduleRequestForm':
+            return self.returnMsg(msg="URl error confirmed", error=True, response=response, forced=False)
+        if data['expected_url'] in response.url and data['expected_url'] != "":
+            return self.returnMsg(error=False, response=response, forced=False)
+        
+        if data.get('tag'):
             text_result = soup.find(data['tag'], {data['type']: data['value']})
             if text_result:
                 text_result = text_result.text.strip().lower()
@@ -65,11 +70,8 @@ class BaseRequest:
                 for text in data['not_expected']:
                     if text in text_result:
                         return self.returnMsg(msg=text_result, error=True, response=response, forced=False)
-        
-        if data['not_expected_url'] in response.text and self.current_screen == 'ScheduleRequestForm':
-            return self.returnMsg(msg="URl error confirmed", error=True, response=response, forced=False)
-        if data['expected_url'] in response.url:
-            return self.returnMsg(error=False, response=response, forced=False)
+            else:
+                self.returnMsg(msg=text_result, error=True, response=response, forced=False)
         else:
             return True
 
@@ -95,7 +97,7 @@ class BaseRequest:
                     "total_files":self.total_files,
                     "data":self.files
                     }}
-            requests.request("POST", url='http://127.0.0.1:8000/webhook', json=event, timeout=10)
+            requests.request("POST", url=self.URL_WOOK, json=event, timeout=10)
     
                 
 
@@ -111,10 +113,22 @@ class BaseRequest:
         return decorator
 
 
-    def find_text(self, num=str):
-        with open(f'json_files/itens_{self.instancia}.json') as f:
-            js = json.load(f)
-        return self.inputs.update({'num_termo': num, 'ipDesc': js[num]})
+    def find_text(self, num_termo=str, num_anexo=str):
+        try:
+            js_process = self.open_json()
+            js_anexo = self.open_json(json_name="anexo")
+            return self.inputs.update({'num_termo': num_termo, 'ipDesc': js_process[num_termo],
+                                       "num_anexo": num_anexo, 'ipDescAnexo': js_anexo[num_anexo]})
+        except Exception as e:
+            ValueError(f'number is not in the json: {e}')
+    
+    def open_json(self, json_name=None):
+        if json_name == "anexo":
+            filename = f"itens_anexo_{self.instancia}"
+        else:
+            filename = f"itens_{self.instancia}"
+        with open(f'json_files/{filename}.json') as f:
+            return json.load(f)
     
 
     def add_schedule(self, qtddoc, descDoc):
@@ -122,8 +136,9 @@ class BaseRequest:
             (f'j_id223:{qtddoc}:ordem', '2'),
             (f'j_id223:{qtddoc}:descDoc', descDoc),
             (f'j_id223:{qtddoc}:numeroDoc', ''),
-            (f'j_id223:{qtddoc}:tipoDoc', self.inputs['num_termo']) 
+            (f'j_id223:{qtddoc}:tipoDoc', self.inputs['num_anexo']) 
             ]
+    
         
     def request(self, method, url, decode:bool, headers=None, payload=None, params=None, files=None):
             try:
@@ -136,7 +151,7 @@ class BaseRequest:
             except:
                 return "Failed to process the request"
 
-    def update_form(self, payload, headers, descDoc=None, ):
+    def update_form(self, payload, headers, descDoc=None):
             scheme = SCHEME(inputs=self.inputs, peticionarUrl=self.peticionarHTML.url)
             payloadUpdate = scheme['GlobalForm']['payload']
             headersUpdate = scheme['GlobalForm']['headers']
@@ -165,8 +180,7 @@ class BaseRequest:
                        password=password, captcha=captcha)[screen][element]
         for data in datas:
             if data.get('update_form'):
-                data['payload'], data['headers'] = self.update_form(descDoc=arquivo, 
-                                                    payload=data['payload'], headers=data['headers'])
+                data['payload'], data['headers'] = self.update_form(payload=data['payload'], headers=data['headers'], descDoc=arquivo)
             response = self.request(method=data['method'], 
                          url=data['url'], payload=data['payload'], 
                          headers=data['headers'], params=data['params'],

@@ -1,7 +1,6 @@
 
 import requests
 import base64
-import base64
 import magic
 import io
 import mimetypes
@@ -24,15 +23,15 @@ async def upload(request: Request):
         
         client.set_global_variable(len(content['files']), content['idTarefa'], content['processo'], content['instancia'])
         client.login(username=content['username'], password=content['password'], session=session)
-        cont = 0 
-        for num, file in enumerate(content['files']):
-            cont += 1
-            mime, mimetype, file_size = get_extension(file)
-            decode_file = base64.b64decode(file)
-            client.start(content=content, num=num, mimetype=mimetype, 
-                         file=decode_file, mime=mime, file_size=file_size, cont=cont)
 
-        return {"message": f"Successfully uploaded files"}
+        for num, file in enumerate(content['files']):
+            mime, mimetype, file_size = get_extension(file['b64Content'])
+            decode_file = base64.b64decode(file['b64Content'])
+            client.start(content=content, mimetype=mimetype, file=decode_file, mime=mime,
+                         file_size=file_size, cont=num+1, file_options=file)
+            
+        return {"sucesso" : True}
+    
     except MainClientException as e:
         client.returnMsg(msg=F"Fatal Error: {e}", error= True, forced=True)
         return error(e.args[0])
@@ -59,7 +58,6 @@ def get_content(content, required_fields):
 def validate_content(content, required_fields):
     for field in required_fields:
         if field not in content:
-            print(field)
             raise MainClientException("Requisição inválida.")
 
 def error(msg="Erro desconhecido ao processar requisição."):

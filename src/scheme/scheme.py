@@ -29,7 +29,7 @@ def SCHEME(inputs=dict(), arquivo=None, files=None,
                             "params": {}
                             }],
                 "expected_message": {
-                                "tag": "span", "type": "class", "value": "rich-messages-label",
+                                "tag": "",
                                 "expected_text": '',
                                 "not_expected_url": "",
                                 "expected_url": "QuadroAviso/listViewQuadroAvisoMensagem.seam",
@@ -70,7 +70,7 @@ def SCHEME(inputs=dict(), arquivo=None, files=None,
                             "update_form": True,
                             "files": {},
                             "payload":{
-                                        f"j_id223:{inputs.get('qtdDoc')}:tipoDoc": inputs.get('num_termo'),
+                                        f"j_id223:{inputs.get('qtdDoc')}:tipoDoc": inputs.get('num_anexo'),
                                         f"j_id223:{inputs.get('qtdDoc')}:j_id254": f"j_id223:{inputs.get('qtdDoc')}:j_id254",
                                         "ajaxSingle": f"j_id223:{inputs.get('qtdDoc')}:tipoDoc"
                                         },
@@ -133,6 +133,35 @@ def SCHEME(inputs=dict(), arquivo=None, files=None,
                         },
         "PrepareUpload": {
                 "requests": [{
+                            "method": "POST", 
+                            "url": f"{inputs.get('URL_BASE')}/Processo/CadastroPeticaoAvulsa/peticaoPopUp.seam",
+                            "decode": True,
+                            "update_form": False,
+                            "files": {},
+                            "payload":{
+                                        'AJAXREQUEST': '_viewRoot',
+                                        'formularioUpload': 'formularioUpload',
+                                        'cbTDDecoration:cbTD': inputs.get('num_termo'),
+                                        'ipDescDecoration:ipDesc': inputs.get('ipDesc'),
+                                        'ipNroDecoration:ipNro': '',
+                                        'raTipoDocPrincipal': 'HTML',
+                                        'javax.faces.ViewState': inputs.get('ViewState'),
+                                        "cbTDDecoration:cbTD": inputs.get('num_termo'),
+                                        "cbTDDecoration:j_id81": "cbTDDecoration:j_id81",
+                                        "ajaxSingle": "cbTDDecoration:cbTD",
+                                        "AJAX:EVENTS_COUNT": "1"
+                                    },
+                            "headers": {
+                                        'Accept': '*/*',
+                                        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7,it;q=0.6',
+                                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                        'Origin': inputs.get('domain'),
+                                        'Host': inputs.get('domain').split('//')[1],
+                                        'Referer': peticionarUrl,
+                                        },
+                            "params": {}
+                                },
+                            {
                             "method": "POST", 
                             "url": f"{inputs.get('URL_BASE')}/Processo/CadastroPeticaoAvulsa/peticaoPopUp.seam",
                             "decode": True,
