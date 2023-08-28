@@ -13,7 +13,7 @@ class Pje_pet(BaseRequest):
     def antiCaptcha(self):
         solver = hCaptchaProxyless()
         solver.set_verbose(1)
-        solver.set_key("fa901ee28ac52b82d466a87985a19092")
+        solver.set_key("YOUR-TOKEN")
         solver.set_website_url("https://pje.tjba.jus.br/")
         solver.set_website_key('4098ab2e-d12a-40a8-b836-46df3b32df3f')
         result = solver.solve_and_return_solution()
